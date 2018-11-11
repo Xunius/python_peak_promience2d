@@ -487,6 +487,9 @@ if __name__=='__main__':
     ax1=figure.add_subplot(2,2,1)
 
     ax1.contourf(XX,YY,slab,levels=np.arange(0,zmax,1))
+    ax1.set_xlabel('X')
+    ax1.set_ylabel('Y')
+    ax1.set_title('Top view, col contours as dashed lines')
 
     for kk,vv in peaks.items():
         print kk
@@ -496,6 +499,9 @@ if __name__=='__main__':
     line=slab[slab.shape[0]//2]
     ax2=figure.add_subplot(2,2,2)
     ax2.plot(xx,line,'b-')
+    ax2.set_xlabel('X')
+    ax2.set_ylabel('Z')
+    ax2.set_title('Cross section through y=0')
 
     for kk,vv in peaks.items():
         xii,yii=vv['center']
