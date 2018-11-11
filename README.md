@@ -18,5 +18,5 @@ Optionally, peaks with small prominence or area can be filtered out.
 
 See a toy example below:
 
-
+![](https://github.com/Xunius/python_peak_promience2d/blob/master/demo.png)
 
