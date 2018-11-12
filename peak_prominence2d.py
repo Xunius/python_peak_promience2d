@@ -420,7 +420,6 @@ def getProminence(var,step,lats=None,lons=None,min_depth=None,
                                 del prominence[mm]
                                 if mm in parents:
                                     del parents[mm]
-                                match_list.remove(mm)
                             else:
                                 match_list2.append(mm)
                         match_list=match_list2
