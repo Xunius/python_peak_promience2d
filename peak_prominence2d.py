@@ -25,9 +25,7 @@ import numpy as np
 from matplotlib.transforms import Bbox
 from matplotlib.path import Path
 import matplotlib.pyplot as plt
-
-
-
+from scipy.interpolate import interp1d
 
 
 
@@ -217,10 +215,14 @@ def getProminence(var,step,lats=None,lons=None,min_depth=None,
         return fails
 
     var=np.ma.masked_where(np.isnan(var),var).astype('float')
+    needslerpx=True
+    needslerpy=True
     if lats is None:
         lats=np.arange(var.shape[0])
+        needslerpy=False
     if lons is None:
         lons=np.arange(var.shape[1])
+        needslerpx=False
 
     if area_func==contourGeoArea:
         from mpl_toolkits.basemap import Basemap
@@ -376,6 +378,7 @@ def getProminence(var,step,lats=None,lons=None,min_depth=None,
                     npeak+=1
                     peaks[npeak]=[contjj,]
                     prominence[npeak]=levii
+                    parents[npeak]=0
 
                 elif len(match_list)==1:
                     peaks[match_list[0]].append(contjj)
@@ -406,6 +409,7 @@ def getProminence(var,step,lats=None,lons=None,min_depth=None,
                             if prominence[mm]==peaks[mm][0].level and mm!=max_idx:
                                 prominence[mm]=peaks[mm][0].level-levii
                                 parents[mm]=max_idx
+                        peaks[max_idx].append(contjj)
 
                     #---------------Filter by prominence---------------
                     if min_depth is not None and len(match_list)>1:
@@ -427,11 +431,18 @@ def getProminence(var,step,lats=None,lons=None,min_depth=None,
 
     #------------------Prepare output------------------
     result={}
+    result_map=np.zeros(var.shape)
+    parent_map=np.zeros(var.shape)-1
+    id_map=np.zeros(var.shape)
 
     keys=peaks.keys()
     for ii in range(len(peaks)):
         kk=keys[ii]
         vv=peaks[kk]
+        #--------------Remove singleton peaks--------------
+        if len(vv)<2:
+            continue
+        
         lev_range=[cii.level for cii in vv]
         prokk=prominence[kk]
 
@@ -441,7 +452,7 @@ def getProminence(var,step,lats=None,lons=None,min_depth=None,
         centerkk=np.mean(centerkk,axis=0)
 
         peakii={
-            'id'         : ii,
+            'id'         : kk,
             'height'  : np.max(lev_range),
             'col_level'  : np.min(lev_range),
             'prominence'  : prokk,
@@ -452,11 +463,30 @@ def getProminence(var,step,lats=None,lons=None,min_depth=None,
             'parent'     : parents[kk]
             }
 
-        result[ii]=peakii
+        result[kk]=peakii
+        # lerp1 to get center indices
+        if needslerpx:
+            fitx=interp1d(lons,np.arange(var.shape[1]))
+            xidx=fitx(centerkk[0])
+        else:
+            xidx=centerkk[0]
+
+        if needslerpy:
+            fity=interp1d(lats,np.arange(var.shape[0]))
+            yidx=fity(centerkk[1])
+        else:
+            yidx=centerkk[1]
+
+        xidx=np.around(xidx,0).astype('int')
+        yidx=np.around(yidx,0).astype('int')
+
+        id_map[yidx,xidx]=kk
+        result_map[yidx,xidx]=prokk
+        parent_map[yidx,xidx]=parents[kk]
 
     plt.close(fig)
 
-    return result
+    return result, id_map, result_map, parent_map
 
 
 
@@ -477,7 +507,7 @@ if __name__=='__main__':
 
     step=0.2
     zmax=slab.max()
-    peaks=getProminence(slab,step,lats=yy,lons=xx,min_area=None,
+    peaks,idmap,promap,parentmap=getProminence(slab,step,lats=yy,lons=xx,min_area=None,
             include_edge=True)
 
     #-------------------Plot------------------------
@@ -514,7 +544,7 @@ if __name__=='__main__':
                 verticalalignment='bottom')
 
     ax3=figure.add_subplot(2,2,3,projection='3d')
-    ax3.plot_surface(XX,YY,slab,rstride=1,cstride=1,linewidth=0.5,alpha=0.6)
+    ax3.plot_surface(XX,YY,slab,rstride=4,cstride=4,cmap='viridis',alpha=0.8)
 
     for kk,vv in peaks.items():
         xii,yii=vv['center']
@@ -522,6 +552,14 @@ if __name__=='__main__':
         pro=vv['prominence']
         z1ii=z2ii-pro
         ax3.plot([xii,xii],[yii,yii],[z1ii,z2ii], color='r', linewidth=2)
+
+    ax4=figure.add_subplot(2,2,4)
+    cs=ax4.imshow(promap,origin='lower',interpolation='nearest',
+            extent=[-10,10,-10,10])
+    ax4.set_xlabel('X')
+    ax4.set_ylabel('Y')
+    ax4.set_title('Top view, prominences at peaks')
+    plt.colorbar(cs,ax=ax4)
 
     plt.show(block=False)
 
